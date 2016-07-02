@@ -13,18 +13,30 @@ wifi.setmode (wifi.STATION)
 wifi.sta.config (SSID, SSID_PASSWORD)
 wifi.sta.autoconnect (1)
 
+-- Simple read adc function
+-- Based on voltage divider where R1 = 3.3k and R2 = 1K
+-- Needs a Lithium battery (4.3V max)
+function readADC()
+    ad = 0
+    ad=ad+adc.read(0)*4/9.78
+    print(ad)
+    return ad
+end
+
 -- Hang out until we get a wifi connection before the httpd server is started.
 print ("Waiting for connection...")
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     print ("Config done, IP is " .. T.IP)
-    local status, temp, humi, temp_dec, humi_dec = dht.read(pin)
+    local status, temp, humi, temp_dec, humi_dec = dht.readxx(pin)
+
     if status == dht.OK then
-        http.get(string.format("https://api.thingspeak.com/update?api_key=%s&field1=%d.%03d&field2=%d.%03d",
+        http.get(string.format("https://api.thingspeak.com/update?api_key=%s&field1=%d.%03d&field2=%d.%03d&field3=%d",
           THINGSPEAK_KEY,
           math.floor(temp),
           temp_dec,
           math.floor(humi),
-          humi_dec), nil, function(code, data)
+          humi_dec,
+          readADC()), nil, function(code, data)
             if (code < 0) then
                 print("HTTP request failed")
             else

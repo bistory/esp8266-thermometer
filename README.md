@@ -4,7 +4,7 @@ A simple project based on the ESP8266 and the DHT22 temperature and humidity sen
 
 ## Installation / dependencies
 
-Go to NodeMCU-Build(http://nodemcu-build.com/) and download a firmware with DHT, file, GPIO, net, node, RTC Time, timer, UART and WiFi.
+Go to NodeMCU-Build(http://nodemcu-build.com/) and download a firmware with ADC, DHT, file, GPIO, net, node, RTC Time, timer, UART and WiFi.
 
 Flash your ESP with it then upload the init file of this project using ESPlorer.
 
