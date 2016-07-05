@@ -23,8 +23,15 @@ function readADC()
     return ad
 end
 
+function sleep()
+    node.dsleep(1800000000)
+end
+
 -- Hang out until we get a wifi connection before the httpd server is started.
 print ("Waiting for connection...")
+wifi.sta.eventMonReg(wifi.STA_WRONGPWD, sleep)
+wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, sleep)
+wifi.sta.eventMonReg(wifi.STA_FAIL, sleep)
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     print ("Config done, IP is " .. T.IP)
     local status, temp, humi, temp_dec, humi_dec = dht.readxx(pin)
@@ -42,7 +49,7 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
             else
                 print(code, data)
             end
-            node.dsleep(1800000000)
+            sleep()
         end)
     elseif status == dht.ERROR_CHECKSUM then
         print( "DHT Checksum error." )
