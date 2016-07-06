@@ -16,24 +16,15 @@ wifi.sta.autoconnect (1)
 -- Simple read adc function
 -- Based on voltage divider where R1 = 3.3k and R2 = 1K
 -- Needs a Lithium battery (4.3V max)
-function readADC()
+local function readADC()
     ad = 0
     ad=ad+adc.read(0)*4/9.78
     print(ad)
     return ad
 end
 
-function sleep()
-    rtctime.dsleep(1800000000)
-end
-
--- Hang out until we get a wifi connection before the httpd server is started.
-print("Waiting for connection...")
-wifi.sta.eventMonReg(wifi.STA_WRONGPWD, sleep)
-wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, sleep)
-wifi.sta.eventMonReg(wifi.STA_FAIL, sleep)
-wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
-    print("Config done, IP is " .. T.IP)
+local function readDHT()
+  -- Read DHT (all models except DHT11) temperature
     local status, temp, humi, temp_dec, humi_dec = dht.readxx(pin)
 
     if status == dht.OK then
@@ -56,4 +47,44 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     elseif status == dht.ERROR_TIMEOUT then
         print("DHT timed out.")
     end
+end
+
+-- Put the device in deep sleep mode for 30 minutes
+local function sleep()
+    rtctime.dsleep(1800000000)
+end
+
+-- Convert date&time to unix epoch time
+local function date2unix(h, n, s, y, m, d, w)
+    local a, jd
+    a = (14 - m) / 12
+    y = y + 4800 - a
+    m = m + 12*a - 3
+    jd = d + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045
+    return (jd - 2440588)*86400 + h*3600 + n*60 +s
+end
+
+-- Hang out until we get a wifi connection.
+print("Waiting for connection...")
+
+-- If connection fails, wait 30 minutes.
+wifi.sta.eventMonReg(wifi.STA_WRONGPWD, sleep)
+wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, sleep)
+wifi.sta.eventMonReg(wifi.STA_FAIL, sleep)
+
+-- If connection is successful, read DHT and post
+wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
+    print("Config done, IP is " .. T.IP)
+
+    -- If initial boot, then sync RTC to NTP
+    -- Only on initial boot to save power
+    local _, reset_reason = node.bootreason()
+    if reset_reason == 0 then
+      print("Syncing NTP...")
+      sntp.sync(nil, function(sec,usec,server)
+        print('Synced', sec, usec, server)
+      end)
+    end
+
+    readDHT()
 end)

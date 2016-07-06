@@ -4,9 +4,9 @@ A simple project based on the ESP8266 and the DHT22 temperature and humidity sen
 
 ## Installation / dependencies
 
-Go to NodeMCU-Build(http://nodemcu-build.com/) and download a firmware with ADC, DHT, file, GPIO, net, node, RTC Time, timer, UART and WiFi.
+Go to NodeMCU-Build(http://nodemcu-build.com/) and download a firmware with ADC, DHT, file, GPIO, net, node, RTC Time, SNTP, timer, UART and WiFi.
 
-Flash your ESP with it then upload the init file of this project using ESPlorer.
+Flash your ESP with it the float one then upload the init file of this project using ESPlorer.
 
 This program uses deepsleep to don't forget to wire GPIO0 and RST to enable it.
 
