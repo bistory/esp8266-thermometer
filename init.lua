@@ -10,15 +10,24 @@ local pin = 4
 
 -- Configure the ESP as a station (client)
 wifi.setmode (wifi.STATION)
-wifi.sta.config (SSID, SSID_PASSWORD)
-wifi.sta.autoconnect (1)
+wifi.sta.config (SSID, SSID_PASSWORD, 1)
+
+-- Put the device in deep sleep mode for 30 minutes
+local function sleep()
+    print("Going to sleep...")
+    rtctime.dsleep(1800000000)
+end
+
+local function failstorage()
+    sleep()
+end
 
 -- Simple read adc function
 -- Based on voltage divider where R1 = 3.3k and R2 = 1K
 -- Needs a Lithium battery (4.3V max)
 local function readADC()
     ad = 0
-    ad=ad+adc.read(0)*4/9.78
+    ad=ad+adc.read(0)*4/978
     print(ad)
     return ad
 end
@@ -49,11 +58,6 @@ local function readDHT()
     end
 end
 
--- Put the device in deep sleep mode for 30 minutes
-local function sleep()
-    rtctime.dsleep(1800000000)
-end
-
 -- Convert date&time to unix epoch time
 local function date2unix(h, n, s, y, m, d, w)
     local a, jd
@@ -67,10 +71,10 @@ end
 -- Hang out until we get a wifi connection.
 print("Waiting for connection...")
 
--- If connection fails, wait 30 minutes.
-wifi.sta.eventMonReg(wifi.STA_WRONGPWD, sleep)
-wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, sleep)
-wifi.sta.eventMonReg(wifi.STA_FAIL, sleep)
+-- If connection fails, stores data locally then wait 30 minutes.
+wifi.sta.eventMonReg(wifi.STA_WRONGPWD, failstorage)
+wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, failstorage)
+wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
 
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
@@ -79,10 +83,12 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     -- If initial boot, then sync RTC to NTP
     -- Only on initial boot to save power
     local _, reset_reason = node.bootreason()
-    if reset_reason == 0 then
+    if reset_reason == 0 or reset_reason == 6 then
       print("Syncing NTP...")
-      sntp.sync(nil, function(sec,usec,server)
+      sntp.sync('85.88.55.5', function(sec,usec,server)
         print('Synced', sec, usec, server)
+      end, function(errno)
+        print('Sync failed !', errno)
       end)
     end
 
