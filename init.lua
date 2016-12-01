@@ -7,10 +7,16 @@ local SSID = "xxxxx"
 local SSID_PASSWORD = "xxxxx"
 local THINGSPEAK_KEY = "xxxxx"
 local pin = 4
+local logfile = "data.log"
+
+-- Force ADC mode to external ADC
+adc.force_init_mode(adc.INIT_ADC)
 
 -- Configure the ESP as a station (client)
-wifi.setmode (wifi.STATION)
-wifi.sta.config (SSID, SSID_PASSWORD, 1)
+wifi.setmode(wifi.STATION)
+wifi.setphymode(wifi.PHYMODE_N)
+wifi.sleeptype(wifi.MODEM_SLEEP)
+wifi.sta.config(SSID, SSID_PASSWORD, 1)
 
 -- Put the device in deep sleep mode for 30 minutes
 local function sleep()
@@ -32,40 +38,96 @@ local function readADC()
     return ad
 end
 
-local function readDHT()
-  -- Read DHT (all models except DHT11) temperature
-    local status, temp, humi, temp_dec, humi_dec = dht.readxx(pin)
+local function trim(s)
+    return (s:gsub ("^%s*(.-)%s*$", "%1"))
+end
 
-    if status == dht.OK then
-        http.get(string.format("https://api.thingspeak.com/update?api_key=%s&field1=%d.%03d&field2=%d.%03d&field3=%d",
-          THINGSPEAK_KEY,
-          math.floor(temp),
-          temp_dec,
-          math.floor(humi),
-          humi_dec,
-          readADC()), nil, function(code, data)
-            if (code < 0) then
-                print("HTTP request failed")
-            else
-                print(code, data)
-            end
-            sleep()
-        end)
-    elseif status == dht.ERROR_CHECKSUM then
-        print("DHT Checksum error.")
-    elseif status == dht.ERROR_TIMEOUT then
-        print("DHT timed out.")
+local function writeLog(temp, humi)
+    if file.open(logfile, "a+") then
+        local tm = rtctime.epoch2cal(rtctime.get())
+        local date = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", tm["year"], tm["mon"], tm["day"], tm["hour"], tm["min"], tm["sec"])
+        file.writeline(date)
+        file.writeline(string.format("%.1f", temp))
+        file.writeline(string.format("%.1f", humi))
+        file.writeline(string.format("%.4f", readADC()))
+        file.close()
+        print(string.format("Logged data at %s", date))
     end
 end
 
--- Convert date&time to unix epoch time
-local function date2unix(h, n, s, y, m, d, w)
-    local a, jd
-    a = (14 - m) / 12
-    y = y + 4800 - a
-    m = m + 12*a - 3
-    jd = d + (153 * m + 2) / 5 + 365 * y + y / 4 - y / 100 + y / 400 - 32045
-    return (jd - 2440588)*86400 + h*3600 + n*60 +s
+local function readLog()
+    print("Reading new line")
+    local date = file.readline()
+    if (date == nil) then
+        file.close()
+        print("Removed log file")
+        file.remove(logfile)
+        sleep()
+    end
+    local temperature = file.readline()
+    local humidity = file.readline()
+    local adc = file.readline()
+
+    http.get(string.format("http://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s",
+      THINGSPEAK_KEY,
+      temperature,
+      humidity,
+      adc,
+      trim(date)), nil, function(code, data)
+        if (code < 0) then
+            print("HTTP request failed")
+            sleep()
+        else
+            print(code, data)
+        end
+    end)
+end
+
+local function readDHT()
+    -- Read DHT (all models except DHT11) temperature
+    local status, temp, humi, temp_dec, humi_dec = dht.readxx(pin)
+
+    if wifi.sta.getip() == nil then
+        -- Log data when wifi is unavailable
+        writeLog(temp, humi)
+        sleep()
+    else
+        if status == dht.OK then
+            http.get(string.format("http://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.4f",
+              THINGSPEAK_KEY,
+              temp,
+              humi,
+              readADC()), nil, function(code, data)
+                if (code < 0) then
+                    print("HTTP request failed")
+                    logData(temp, humi)
+                    sleep()
+                else
+                    print(code, data)
+
+                    -- Opens log and send data to the server
+                    if file.open(logfile, "r") then
+                        print("Reading log file...")
+        
+                        local mytimer = tmr.create()
+        
+                        mytimer:register(15500, tmr.ALARM_AUTO, function (t)
+                            readLog()
+                        end)
+                        mytimer:start()
+                    else
+                        sleep()
+                    end
+                end
+            end)
+        elseif status == dht.ERROR_CHECKSUM then
+            print("DHT Checksum error.")
+            sleep()
+        elseif status == dht.ERROR_TIMEOUT then
+            print("DHT timed out.")
+            sleep()
+        end
+    end
 end
 
 -- Hang out until we get a wifi connection.
@@ -82,15 +144,43 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
 
     -- If initial boot, then sync RTC to NTP
     -- Only on initial boot to save power
-    local _, reset_reason = node.bootreason()
-    if reset_reason == 0 or reset_reason == 6 then
-      print("Syncing NTP...")
-      sntp.sync('85.88.55.5', function(sec,usec,server)
-        print('Synced', sec, usec, server)
-      end, function(errno)
-        print('Sync failed !', errno)
-      end)
+    local sec, _ = rtctime.get()
+    if sec == 0 then
+        rtcmem.write32(10, 0)
     end
+    local mem = rtcmem.read32(10)
 
-    readDHT()
+    if sec == 0 or mem == 0 or mem == 1 then
+        print(reset_reason)
+        print("Syncing NTP...")
+        sntp.sync('85.88.55.5', function(sec,usec,server)
+            print('Synced', sec, usec, server, mem)
+            local memval = 2
+            if(mem == 0) then
+                memval = 1
+            end
+            print(memval)
+            rtcmem.write32(10, memval)
+            readDHT()
+        end, function(errno)
+            print('Sync failed !', errno)
+            readDHT()
+      end)
+    else
+        if(mem < 100) then
+            mem = mem + 1
+            rtcmem.write32(10, mem)
+        else
+            rtcmem.write32(10, 0)
+        end
+        readDHT()
+    end
+end)
+
+-- Force sleep when WiFi is not responding
+tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
+    if wifi.sta.getip() == nil then
+        print('WiFi not responding. Sleeping now.')
+        readDHT()
+    end
 end)
