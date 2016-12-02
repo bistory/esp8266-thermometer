@@ -44,14 +44,17 @@ end
 
 local function writeLog(temp, humi)
     if file.open(logfile, "a+") then
-        local tm = rtctime.epoch2cal(rtctime.get())
-        local date = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", tm["year"], tm["mon"], tm["day"], tm["hour"], tm["min"], tm["sec"])
-        file.writeline(date)
-        file.writeline(string.format("%.1f", temp))
-        file.writeline(string.format("%.1f", humi))
-        file.writeline(string.format("%.4f", readADC()))
-        file.close()
-        print(string.format("Logged data at %s", date))
+        local time = rtctime.get()
+        if time > 0 then
+            local tm = rtctime.epoch2cal(time)
+            local date = string.format("%04d-%02d-%02dT%02d:%02d:%02dZ", tm["year"], tm["mon"], tm["day"], tm["hour"], tm["min"], tm["sec"])
+            file.writeline(date)
+            file.writeline(string.format("%.1f", temp))
+            file.writeline(string.format("%.1f", humi))
+            file.writeline(string.format("%.4f", readADC()))
+            file.close()
+            print(string.format("Logged data at %s", date))
+        end
     end
 end
 
