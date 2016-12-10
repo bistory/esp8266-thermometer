@@ -136,6 +136,14 @@ end
 -- Hang out until we get a wifi connection.
 print("Waiting for connection...")
 
+-- Force sleep when WiFi is not responding
+local force_sleep = tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
+    if wifi.sta.getip() == nil then
+        print('WiFi not responding. Sleeping now.')
+        readDHT()
+    end
+end)
+
 -- If connection fails, stores data locally then wait 30 minutes.
 wifi.sta.eventMonReg(wifi.STA_WRONGPWD, failstorage)
 wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, failstorage)
@@ -143,6 +151,8 @@ wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
 
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
+    -- Stops force sleep
+    tmr.unregister(force_sleep)
     print("Config done, IP is " .. T.IP)
 
     -- If initial boot, then sync RTC to NTP
@@ -170,20 +180,13 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
             readDHT()
       end)
     else
+        -- Force re-sync NTP every 100 calls
         if(mem < 100) then
             mem = mem + 1
             rtcmem.write32(10, mem)
         else
             rtcmem.write32(10, 0)
         end
-        readDHT()
-    end
-end)
-
--- Force sleep when WiFi is not responding
-tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
-    if wifi.sta.getip() == nil then
-        print('WiFi not responding. Sleeping now.')
         readDHT()
     end
 end)
