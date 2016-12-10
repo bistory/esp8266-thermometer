@@ -5,9 +5,11 @@
 -- Your Wifi connection data
 local SSID = "xxxxx"
 local SSID_PASSWORD = "xxxxx"
+local THINGSPEAK_CHANNEL = "xxxxx"
 local THINGSPEAK_KEY = "xxxxx"
 local pin = 4
 local logfile = "data.log"
+local mqtt = nil
 
 -- Force ADC mode to external ADC
 adc.force_init_mode(adc.INIT_ADC)
@@ -21,6 +23,9 @@ wifi.sta.config(SSID, SSID_PASSWORD, 1)
 -- Put the device in deep sleep mode for 30 minutes
 local function sleep()
     print("Going to sleep...")
+    if mqtt then
+        mqtt:close()
+    end
     rtctime.dsleep(1800000000)
 end
 
@@ -71,19 +76,11 @@ local function readLog()
     local humidity = file.readline()
     local adc = file.readline()
 
-    http.get(string.format("http://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s",
-      THINGSPEAK_KEY,
-      temperature,
-      humidity,
-      adc,
-      trim(date)), nil, function(code, data)
-        if (code < 0) then
-            print("HTTP request failed")
-            sleep()
-        else
-            print(code, data)
-        end
-    end)
+    local route = string.format("/channels/%s/publish/%s", THINGSPEAK_CHANNEL, THINGSPEAK_KEY)
+    local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s", temperature, humidity, adc, trim(date))
+    mqtt:publish(route, parameters, 0, 0, function(client)
+            print("Published delayed data")
+        end)
 end
 
 local function readDHT()
@@ -96,18 +93,9 @@ local function readDHT()
         sleep()
     else
         if status == dht.OK then
-            http.get(string.format("http://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.4f",
-              THINGSPEAK_KEY,
-              temp,
-              humi,
-              readADC()), nil, function(code, data)
-                if (code < 0) then
-                    print("HTTP request failed")
-                    logData(temp, humi)
-                    sleep()
-                else
-                    print(code, data)
-
+            local route = string.format("/channels/%s/publish/%s", THINGSPEAK_CHANNEL, THINGSPEAK_KEY)
+            local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f", temp, humi, readADC())
+            mqtt:publish(route, parameters, 0, 0, function(client)
                     -- Opens log and send data to the server
                     if file.open(logfile, "r") then
                         print("Reading log file...")
@@ -121,8 +109,7 @@ local function readDHT()
                     else
                         sleep()
                     end
-                end
-            end)
+                end)
         elseif status == dht.ERROR_CHECKSUM then
             print("DHT Checksum error.")
             sleep()
@@ -154,6 +141,10 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     -- Stops force sleep
     tmr.unregister(force_sleep)
     print("Config done, IP is " .. T.IP)
+
+    -- Init connection to mqtt server
+    mqtt = mqtt.Client("lens_Z0ZfFeZWz2Oe8GJptBAEeTAouNp", 120, "", "")
+    mqtt:connect("mqtt.thingspeak.com", 1883, 0, function(client) print("Connected") end, function(client, reason) print("Failed reason: "..reason) end)
 
     -- If initial boot, then sync RTC to NTP
     -- Only on initial boot to save power
