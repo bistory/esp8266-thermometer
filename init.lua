@@ -5,9 +5,11 @@
 -- Your Wifi connection data
 local SSID = "xxxxx"
 local SSID_PASSWORD = "xxxxx"
+local THINGSPEAK_CHANNEL = "xxxxx"
 local THINGSPEAK_KEY = "xxxxx"
 local pin = 4
 local logfile = "data.log"
+local m = nil
 
 -- Force ADC mode to external ADC
 adc.force_init_mode(adc.INIT_ADC)
@@ -21,6 +23,9 @@ wifi.sta.config(SSID, SSID_PASSWORD, 1)
 -- Put the device in deep sleep mode for 30 minutes
 local function sleep()
     print("Going to sleep...")
+    if mqtt then
+        m:close()
+    end
     rtctime.dsleep(1800000000)
 end
 
@@ -71,19 +76,11 @@ local function readLog()
     local humidity = file.readline()
     local adc = file.readline()
 
-    http.get(string.format("http://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s",
-      THINGSPEAK_KEY,
-      temperature,
-      humidity,
-      adc,
-      trim(date)), nil, function(code, data)
-        if (code < 0) then
-            print("HTTP request failed")
-            sleep()
-        else
-            print(code, data)
-        end
-    end)
+    local route = string.format("channels/%s/publish/%s", THINGSPEAK_CHANNEL, THINGSPEAK_KEY)
+    local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s", temperature, humidity, adc, trim(date))
+    m:publish(route, parameters, 0, 0, function(client)
+            print("Published delayed data")
+        end)
 end
 
 local function readDHT()
@@ -96,31 +93,22 @@ local function readDHT()
         sleep()
     else
         if status == dht.OK then
-            http.get(string.format("http://api.thingspeak.com/update?api_key=%s&field1=%.1f&field2=%.1f&field3=%.4f",
-              THINGSPEAK_KEY,
-              temp,
-              humi,
-              readADC()), nil, function(code, data)
-                if (code < 0) then
-                    print("HTTP request failed")
-                    logData(temp, humi)
-                    sleep()
+            local route = string.format("channels/%s/publish/%s", THINGSPEAK_CHANNEL, THINGSPEAK_KEY)
+            local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f", temp, humi, readADC())
+            m:publish(route, parameters, 0, 0, function(client)
+                print("Published data")
+                -- Opens log and send data to the server
+                if file.open(logfile, "r") then
+                    print("Reading log file...")
+    
+                    local mytimer = tmr.create()
+    
+                    mytimer:register(15500, tmr.ALARM_AUTO, function (t)
+                        readLog()
+                    end)
+                    mytimer:start()
                 else
-                    print(code, data)
-
-                    -- Opens log and send data to the server
-                    if file.open(logfile, "r") then
-                        print("Reading log file...")
-        
-                        local mytimer = tmr.create()
-        
-                        mytimer:register(15500, tmr.ALARM_AUTO, function (t)
-                            readLog()
-                        end)
-                        mytimer:start()
-                    else
-                        sleep()
-                    end
+                    sleep()
                 end
             end)
         elseif status == dht.ERROR_CHECKSUM then
@@ -137,7 +125,7 @@ end
 print("Waiting for connection...")
 
 -- Force sleep when WiFi is not responding
-local force_sleep = tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
+tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
     if wifi.sta.getip() == nil then
         print('WiFi not responding. Sleeping now.')
         readDHT()
@@ -152,41 +140,46 @@ wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     -- Stops force sleep
-    tmr.unregister(force_sleep)
+    tmr.unregister(0)
     print("Config done, IP is " .. T.IP)
 
-    -- If initial boot, then sync RTC to NTP
-    -- Only on initial boot to save power
-    local sec, _ = rtctime.get()
-    if sec == 0 then
-        rtcmem.write32(10, 0)
-    end
-    local mem = rtcmem.read32(10)
-
-    if sec == 0 or mem == 0 or mem == 1 then
-        print(reset_reason)
-        print("Syncing NTP...")
-        sntp.sync('85.88.55.5', function(sec,usec,server)
-            print('Synced', sec, usec, server, mem)
-            local memval = 2
-            if(mem == 0) then
-                memval = 1
-            end
-            print(memval)
-            rtcmem.write32(10, memval)
-            readDHT()
-        end, function(errno)
-            print('Sync failed !', errno)
-            readDHT()
-      end)
-    else
-        -- Force re-sync NTP every 100 calls
-        if(mem < 100) then
-            mem = mem + 1
-            rtcmem.write32(10, mem)
-        else
+    -- Init connection to mqtt server
+    m = mqtt.Client("lens_Z0ZfFeZWz2Oe8GJptBAEeTAouNp", 120, "", "")
+    m:connect("mqtt.thingspeak.com", 1883, 0, function(client)
+        -- If initial boot, then sync RTC to NTP
+        -- Only on initial boot to save power
+        local sec, _ = rtctime.get()
+        if sec == 0 then
             rtcmem.write32(10, 0)
         end
+        local mem = rtcmem.read32(10)
+    
+        if sec == 0 or mem == 0 or mem == 1 then
+            print("Syncing NTP...")
+            sntp.sync('85.88.55.5', function(sec,usec,server)
+                print('Synced', sec, usec, server, mem)
+                local memval = 2
+                if(mem == 0) then
+                    memval = 1
+                end
+                print(memval)
+                rtcmem.write32(10, memval)
+                readDHT()
+            end, function(errno)
+                print('Sync failed !', errno)
+                readDHT()
+          end)
+        else
+            -- Force re-sync NTP every 100 calls
+            if(mem < 100) then
+                mem = mem + 1
+                rtcmem.write32(10, mem)
+            else
+                rtcmem.write32(10, 0)
+            end
+            readDHT()
+        end
+    end, function(client, reason)
         readDHT()
-    end
+    end)
 end)
