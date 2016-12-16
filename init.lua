@@ -3,14 +3,16 @@
 -- https://github.com/bistory/esp8266-thermometer
 
 -- Your Wifi connection data
-local SSID = "carotom"
-local SSID_PASSWORD = "caranelle"
-local THINGSPEAK_CHANNEL = "127851"
-local THINGSPEAK_KEY = "MQH51X8OL8LNNFCO"
+local SSID = "xxxxx"
+local SSID_PASSWORD = "xxxxx"
+local THINGSPEAK_KEY = "xxxxx"
+local THINGSPEAK_KEY = "xxxxx"
 local SDA_PIN = 6 -- sda pin, GPIO12
 local SCL_PIN = 5 -- scl pin, GPIO14
 local logfile = "data.log"
 local m = nil
+local temp = nil
+local humi = nil
 
 -- Force ADC mode to external ADC
 adc.force_init_mode(adc.INIT_ADC)
@@ -84,16 +86,7 @@ local function readLog()
         end)
 end
 
-local function readsi7021()
-    -- Read si7021 temperature and humidity
-    si7021 = require("si7021")
-    si7021.init(SDA_PIN, SCL_PIN)
-    si7021.read(OSS)
-    humi = si7021.getHumidity() / 100
-    temp = si7021.getTemperature() / 100
-    si7021 = nil
-    package.loaded["si7021"]=nil
-
+local function sendData()
     if wifi.sta.getip() == nil then
         -- Log data when wifi is unavailable
         writeLog(temp, humi)
@@ -127,9 +120,19 @@ print("Waiting for connection...")
 tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
     if wifi.sta.getip() == nil then
         print('WiFi not responding. Sleeping now.')
-        readsi7021()
+        sendData()
     end
 end)
+
+
+-- Read si7021 temperature and humidity while waiting for connection
+local si7021 = require("si7021")
+si7021.init(SDA_PIN, SCL_PIN)
+si7021.read(OSS)
+temp = si7021.getTemperature() / 100
+humi = si7021.getHumidity() / 100
+si7021 = nil
+package.loaded["si7021"]=nil
 
 -- If connection fails, stores data locally then wait 30 minutes.
 wifi.sta.eventMonReg(wifi.STA_WRONGPWD, failstorage)
@@ -163,10 +166,10 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
                 end
                 print(memval)
                 rtcmem.write32(10, memval)
-                readsi7021()
+                sendData()
             end, function(errno)
                 print('Sync failed !', errno)
-                readsi7021()
+                sendData()
           end)
         else
             -- Force re-sync NTP every 100 calls
@@ -176,9 +179,9 @@ wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
             else
                 rtcmem.write32(10, 0)
             end
-            readsi7021()
+            sendData()
         end
     end, function(client, reason)
-        readsi7021()
+        sendData()
     end)
 end)
