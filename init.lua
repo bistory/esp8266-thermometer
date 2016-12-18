@@ -79,10 +79,11 @@ local function readLog()
     local humidity = file.readline()
     local adc = file.readline()
 
+    local trim_date = trim(date)
     local route = string.format("channels/%s/publish/%s", THINGSPEAK_CHANNEL, THINGSPEAK_KEY)
-    local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s", temperature, humidity, adc, trim(date))
+    local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s", temperature, humidity, adc, trim_date)
     m:publish(route, parameters, 0, 0, function(client)
-            print(string.format("Published delayed data from %s", trim(date)))
+            print(string.format("Published delayed data from %s", trim_date))
         end)
 end
 
