@@ -5,7 +5,7 @@
 -- Your Wifi connection data
 local SSID = "xxxxx"
 local SSID_PASSWORD = "xxxxx"
-local THINGSPEAK_KEY = "xxxxx"
+local THINGSPEAK_CHANNEL = "xxxxx"
 local THINGSPEAK_KEY = "xxxxx"
 local SDA_PIN = 6 -- sda pin, GPIO12
 local SCL_PIN = 5 -- scl pin, GPIO14
@@ -26,7 +26,7 @@ wifi.sta.config(SSID, SSID_PASSWORD, 1)
 -- Put the device in deep sleep mode for 30 minutes
 local function sleep()
     print("Going to sleep...")
-    if mqtt then
+    if m then
         m:close()
     end
     rtctime.dsleep(1800000000)
@@ -82,7 +82,7 @@ local function readLog()
     local route = string.format("channels/%s/publish/%s", THINGSPEAK_CHANNEL, THINGSPEAK_KEY)
     local parameters = string.format("field1=%.1f&field2=%.1f&field3=%.4f&created_at=%s", temperature, humidity, adc, trim(date))
     m:publish(route, parameters, 0, 0, function(client)
-            print("Published delayed data")
+            print(string.format("Published delayed data from %s", trim(date)))
         end)
 end
 
