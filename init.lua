@@ -103,7 +103,7 @@ local function sendData()
 
                 local mytimer = tmr.create()
 
-                mytimer:register(15500, tmr.ALARM_AUTO, function (t)
+                mytimer:register(17000, tmr.ALARM_AUTO, function (t)
                     readLog()
                 end)
                 mytimer:start()
