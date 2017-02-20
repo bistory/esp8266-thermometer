@@ -3,10 +3,10 @@
 -- https://github.com/bistory/esp8266-thermometer
 
 -- Your Wifi connection data
-local SSID = "carotom"
-local SSID_PASSWORD = "caranelle"
-local THINGSPEAK_CHANNEL = "173399"
-local THINGSPEAK_KEY = "Z30NN8EZ6YWTAORK"
+local SSID = "xxxxx"
+local SSID_PASSWORD = "xxxxx"
+local THINGSPEAK_CHANNEL = "xxxxx"
+local THINGSPEAK_KEY = "xxxxx"
 local SDA_PIN = 6 -- sda pin, GPIO12
 local SCL_PIN = 5 -- scl pin, GPIO14
 local logfile = "data.log"
