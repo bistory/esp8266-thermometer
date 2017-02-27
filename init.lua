@@ -21,7 +21,11 @@ adc.force_init_mode(adc.INIT_ADC)
 wifi.setmode(wifi.STATION)
 wifi.setphymode(wifi.PHYMODE_N)
 wifi.sleeptype(wifi.MODEM_SLEEP)
-wifi.sta.config(SSID, SSID_PASSWORD, 1)
+station_cfg={}
+station_cfg.ssid = SSID
+station_cfg.pwd = SSID_PASSWORD
+station_cfg.auto = true
+wifi.sta.config(station_cfg)
 
 -- Put the device in deep sleep mode for 30 minutes
 local function sleep()
