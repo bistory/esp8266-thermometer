@@ -13,6 +13,7 @@ local logfile = "data.log"
 local m = nil
 local temp = nil
 local humi = nil
+local timeout_tmr = tmr.create()
 
 -- Force ADC mode to external ADC
 adc.force_init_mode(adc.INIT_ADC)
@@ -33,7 +34,7 @@ local function sleep()
     if m then
         m:close()
     end
-    rtctime.dsleep(1800000000)
+    rtctime.dsleep(1800000000, 4)
 end
 
 local function failstorage()
@@ -107,7 +108,7 @@ local function sendData()
 
                 local mytimer = tmr.create()
 
-                mytimer:register(17000, tmr.ALARM_AUTO, function (t)
+                mytimer:register(16500, tmr.ALARM_AUTO, function (t)
                     readLog()
                 end)
                 mytimer:start()
@@ -122,7 +123,7 @@ end
 print("Waiting for connection...")
 
 -- Force sleep when WiFi is not responding
-tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
+timeout_tmr:alarm(6000, tmr.ALARM_SINGLE, function()
     if wifi.sta.getip() == nil then
         print('WiFi not responding. Sleeping now.')
         sendData()
@@ -147,7 +148,7 @@ wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     -- Stops force sleep
-    tmr.unregister(0)
+    timeout_tmr:unregister()
     print("Config done, IP is " .. T.IP)
 
     -- Init connection to mqtt server
