@@ -1,12 +1,12 @@
--- tested on NodeMCU 1.5.1 build 20160626
+-- tested on NodeMCU 2.0.0 build 20170219
 -- sends temperature and humidity to ThingSpeak
 -- https://github.com/bistory/esp8266-thermometer
 
 -- Your Wifi connection data
-local SSID = "carotom"
-local SSID_PASSWORD = "caranelle"
-local THINGSPEAK_CHANNEL = "135257"
-local THINGSPEAK_KEY = "4MGIY5OW3TEFJ3QK"
+local SSID = "xxxxx"
+local SSID_PASSWORD = "xxxxx"
+local THINGSPEAK_CHANNEL = "xxxxx"
+local THINGSPEAK_KEY = "xxxxx"
 local pin = 4
 local logfile = "data.log"
 local timeout_tmr = tmr.create()
