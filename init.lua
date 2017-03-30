@@ -3,13 +3,13 @@
 -- https://github.com/bistory/esp8266-thermometer
 
 -- Your Wifi connection data
-local SSID = "xxxxx"
-local SSID_PASSWORD = "xxxxx"
-local THINGSPEAK_CHANNEL = "xxxxx"
-local THINGSPEAK_KEY = "xxxxx"
+local SSID = "carotom"
+local SSID_PASSWORD = "caranelle"
+local THINGSPEAK_CHANNEL = "135257"
+local THINGSPEAK_KEY = "4MGIY5OW3TEFJ3QK"
 local pin = 4
 local logfile = "data.log"
-local m = nil
+local timeout_tmr = tmr.create()
 
 -- Force ADC mode to external ADC
 adc.force_init_mode(adc.INIT_ADC)
@@ -23,10 +23,10 @@ wifi.sta.config(SSID, SSID_PASSWORD, 1)
 -- Put the device in deep sleep mode for 30 minutes
 local function sleep()
     print("Going to sleep...")
-    if mqtt then
+    if m then
         m:close()
     end
-    rtctime.dsleep(1800000000)
+    rtctime.dsleep(1800000000, 4)
 end
 
 local function failstorage()
@@ -103,7 +103,7 @@ local function readDHT()
     
                     local mytimer = tmr.create()
     
-                    mytimer:register(15500, tmr.ALARM_AUTO, function (t)
+                    mytimer:register(16500, tmr.ALARM_AUTO, function (t)
                         readLog()
                     end)
                     mytimer:start()
@@ -125,7 +125,7 @@ end
 print("Waiting for connection...")
 
 -- Force sleep when WiFi is not responding
-tmr.alarm(0, 6000, tmr.ALARM_SINGLE, function()
+timeout_tmr:alarm(6000, tmr.ALARM_SINGLE, function()
     if wifi.sta.getip() == nil then
         print('WiFi not responding. Sleeping now.')
         readDHT()
@@ -140,7 +140,7 @@ wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
     -- Stops force sleep
-    tmr.unregister(0)
+    timeout_tmr:unregister()
     print("Config done, IP is " .. T.IP)
 
     -- Init connection to mqtt server
