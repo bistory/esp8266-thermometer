@@ -133,9 +133,7 @@ timeout_tmr:alarm(6000, tmr.ALARM_SINGLE, function()
 end)
 
 -- If connection fails, stores data locally then wait 30 minutes.
-wifi.sta.eventMonReg(wifi.STA_WRONGPWD, failstorage)
-wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, failstorage)
-wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
+wifi.eventmon.register(wifi.eventmon.STA_DISCONNECTED, failstorage)
 
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
