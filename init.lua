@@ -140,10 +140,8 @@ humi = si7021.getHumidity() / 100
 si7021 = nil
 package.loaded["si7021"]=nil
 
--- If connection fails, stores data locally then wait 30 minutes.
-wifi.sta.eventMonReg(wifi.STA_WRONGPWD, failstorage)
-wifi.sta.eventMonReg(wifi.STA_APNOTFOUND, failstorage)
-wifi.sta.eventMonReg(wifi.STA_FAIL, failstorage)
+-- If connection fails, stores data locally then wait 30 minutes
+wifi.eventmon.register(wifi.eventmon.STA_DISCONNECTED, failstorage)
 
 -- If connection is successful, read DHT and post
 wifi.eventmon.register(wifi.eventmon.STA_GOT_IP, function(T)
