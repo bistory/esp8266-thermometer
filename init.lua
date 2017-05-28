@@ -37,7 +37,7 @@ local function sleep()
         rtctime.dsleep(15000000)
     else
         print("Going to sleep 30min...")
-        rtctime.dsleep(18000000000)
+        rtctime.dsleep(1800000000)
         --rtctime.dsleep(18000000)
     end
 end
