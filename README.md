@@ -4,7 +4,7 @@ A simple project based on the ESP8266 and the DHT22 temperature and humidity sen
 
 ## Installation / dependencies
 
-Go to NodeMCU-Build(http://nodemcu-build.com/) and download a firmware with ADC, DHT, file, GPIO, net, node, RTC Time, SNTP, timer, UART and WiFi.
+Go to NodeMCU-Build(http://nodemcu-build.com/) and download a firmware with ADC, end user setup, file, GPIO, I²C, net, node, RTC fifo, RTC mem, RTC Time, SNTP, timer, UART and WiFi.
 
 Flash your ESP with it the float one then upload the init file of this project using ESPlorer.
 
@@ -12,10 +12,10 @@ This program uses deepsleep to don't forget to wire GPIO0 and RST to enable it.
 
 ## Usage
 
-Update SSID and SSID_PASSWORD according to your WiFi settings and THINGSPEAK_KEY with the API key of ThingSpeak.
+Update SSID and SSID_PASSWORD according to your WiFi settings, THINGSPEAK_CHANNEL and THINGSPEAK_KEY with the channel ID and the API key of ThingSpeak.
 
 When powered, the device will send data to ThingSpeak once every half hour then will sleep.
 
 ## Todo
 
-I'm planning to implement end user setup and store information locally when the network is unavailable then put data to ThingSpeak when network goes back.
+I'm planning to implement end user setup.
