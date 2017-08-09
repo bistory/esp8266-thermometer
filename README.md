@@ -1,6 +1,6 @@
 # ESP8266 Thermometer
 
-A simple project based on the ESP8266 and the DHT22 temperature and humidity sensor.
+A simple project based on the ESP8266 and the SHT21 temperature and humidity sensor.
 
 ## Installation / dependencies
 
